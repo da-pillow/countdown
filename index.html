@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hell ends</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <section class="card" aria-live="polite">
+        <p class="eyebrow">Countdown to New Year</p>
+        <h1 class="title">hell ends</h1>
+        <p class="subtitle">January 1, 2027 at 12:00 AM (New York time)</p>
+
+        <div id="countdown" class="countdown" role="timer">
+          <div id="months-box" class="time-box">
+            <span id="months" class="time-value">00</span>
+            <span class="time-label">months</span>
+          </div>
+          <div id="days-box" class="time-box">
+            <span id="days" class="time-value">00</span>
+            <span class="time-label">days</span>
+          </div>
+          <div class="time-box">
+            <span id="hours" class="time-value">00</span>
+            <span class="time-label">hours</span>
+          </div>
+          <div class="time-box">
+            <span id="minutes" class="time-value">00</span>
+            <span class="time-label">minutes</span>
+          </div>
+          <div class="time-box">
+            <span id="seconds" class="time-value">00</span>
+            <span class="time-label">seconds</span>
+          </div>
+        </div>
+
+        <p id="complete" class="complete" hidden>Happy New Year 2027</p>
+      </section>
+
+      <section class="card game-card" aria-live="polite">
+        <p class="eyebrow">Mini Game</p>
+        <h2 class="game-title">Tap Rush</h2>
+        <p class="subtitle">Hit the moving target before the round timer ends.</p>
+
+        <div class="game-meta">
+          <p>Score: <span id="game-score">0</span></p>
+          <p>Time: <span id="game-time">20</span>s</p>
+          <p>Best: <span id="game-best">0</span></p>
+        </div>
+
+        <button id="game-start" class="game-start" type="button">Start Round</button>
+
+        <div id="game-board" class="game-board" aria-label="Tap game area">
+          <button
+            id="game-target"
+            class="game-target"
+            type="button"
+            aria-label="Tap target"
+            hidden
+          ></button>
+          <p id="game-message" class="game-message">Press Start Round to play.</p>
+        </div>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
