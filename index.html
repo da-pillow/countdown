@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>hell ends</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -54,6 +57,7 @@
           <p>Score: <span id="game-score">0</span></p>
           <p>Time: <span id="game-time">20</span>s</p>
           <p>Best: <span id="game-best">0</span></p>
+          <p>Last: <span id="game-last">0</span></p>
         </div>
 
         <button id="game-start" class="game-start" type="button">Start Round</button>
@@ -70,6 +74,7 @@
         </div>
       </section>
     </main>
+    <div id="screen-flash" aria-hidden="true"></div>
     <script src="./app.js"></script>
   </body>
 </html>

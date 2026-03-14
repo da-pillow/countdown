@@ -94,15 +94,58 @@ const gameMessageEl = document.getElementById("game-message");
 const gameScoreEl = document.getElementById("game-score");
 const gameTimeEl = document.getElementById("game-time");
 const gameBestEl = document.getElementById("game-best");
+const gameLastEl = document.getElementById("game-last");
+const screenFlashEl = document.getElementById("screen-flash");
 
 const GAME_DURATION_SECONDS = 20;
+const SCORE_STORAGE_KEY = "tap-rush-score-state-v1";
 let gameScore = 0;
 let gameTime = GAME_DURATION_SECONDS;
 let gameTimerId = null;
 let gameRunning = false;
-let gameBest = Number(localStorage.getItem("tap-rush-best") || 0);
+let audioCtx = null;
+
+function loadScoreState() {
+  try {
+    const raw = localStorage.getItem(SCORE_STORAGE_KEY);
+    const legacyBest = Number(localStorage.getItem("tap-rush-best") || 0);
+
+    if (!raw) {
+      return { best: legacyBest, last: 0, hits: 0, misses: 0 };
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      best: Number(parsed.best) || legacyBest,
+      last: Number(parsed.last) || 0,
+      hits: Number(parsed.hits) || 0,
+      misses: Number(parsed.misses) || 0,
+    };
+  } catch {
+    return { best: 0, last: 0, hits: 0, misses: 0 };
+  }
+}
+
+const savedScoreState = loadScoreState();
+let gameBest = savedScoreState.best;
+let gameLast = savedScoreState.last;
+let totalHits = savedScoreState.hits;
+let totalMisses = savedScoreState.misses;
+
+function saveScoreState() {
+  localStorage.setItem(
+    SCORE_STORAGE_KEY,
+    JSON.stringify({
+      best: gameBest,
+      last: gameLast,
+      hits: totalHits,
+      misses: totalMisses,
+    }),
+  );
+}
 
 gameBestEl.textContent = String(gameBest);
+gameLastEl.textContent = String(gameLast);
 
 function randomPositionWithinBoard() {
   const boardRect = gameBoardEl.getBoundingClientRect();
@@ -125,15 +168,18 @@ function endGame() {
   gameTargetEl.hidden = true;
   gameStartEl.disabled = false;
   gameStartEl.textContent = "Play Again";
+  gameLast = gameScore;
+  gameLastEl.textContent = String(gameLast);
 
   if (gameScore > gameBest) {
     gameBest = gameScore;
-    localStorage.setItem("tap-rush-best", String(gameBest));
     gameBestEl.textContent = String(gameBest);
+    saveScoreState();
     gameMessageEl.textContent = "New best score!";
     return;
   }
 
+  saveScoreState();
   gameMessageEl.textContent = "Round over. Try to beat your best.";
 }
 
@@ -151,7 +197,7 @@ function startGame() {
   gameTime = GAME_DURATION_SECONDS;
   gameScoreEl.textContent = "0";
   gameTimeEl.textContent = String(gameTime);
-  gameMessageEl.textContent = "Tap as fast as you can.";
+  gameMessageEl.textContent = "Tap inside the target. Misses cost 1 point.";
   gameStartEl.disabled = true;
   gameTargetEl.hidden = false;
   moveTarget();
@@ -168,18 +214,150 @@ function startGame() {
   }, 1000);
 }
 
+function flashScreen(type) {
+  screenFlashEl.classList.remove("flash-hit", "flash-miss");
+  void screenFlashEl.offsetWidth;
+  screenFlashEl.classList.add(type === "hit" ? "flash-hit" : "flash-miss");
+}
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (Ctor) {
+      audioCtx = new Ctor();
+    }
+  }
+
+  if (audioCtx && audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+
+function playHitSound() {
+  if (!audioCtx) {
+    return;
+  }
+
+  const now = audioCtx.currentTime;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.23, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+  gain.connect(audioCtx.destination);
+
+  const oscA = audioCtx.createOscillator();
+  oscA.type = "triangle";
+  oscA.frequency.setValueAtTime(980, now);
+  oscA.frequency.exponentialRampToValueAtTime(1560, now + 0.12);
+  oscA.connect(gain);
+  oscA.start(now);
+  oscA.stop(now + 0.18);
+
+  const oscB = audioCtx.createOscillator();
+  oscB.type = "square";
+  oscB.frequency.setValueAtTime(740, now);
+  oscB.frequency.exponentialRampToValueAtTime(1180, now + 0.1);
+  oscB.connect(gain);
+  oscB.start(now + 0.01);
+  oscB.stop(now + 0.14);
+}
+
+function playMissSound() {
+  if (!audioCtx) {
+    return;
+  }
+
+  const now = audioCtx.currentTime;
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.setValueAtTime(0.0001, now);
+  masterGain.gain.exponentialRampToValueAtTime(0.32, now + 0.02);
+  masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+  masterGain.connect(audioCtx.destination);
+
+  const osc = audioCtx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(180, now);
+  osc.frequency.exponentialRampToValueAtTime(55, now + 0.35);
+  osc.connect(masterGain);
+  osc.start(now);
+  osc.stop(now + 0.42);
+
+  const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.42, audioCtx.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < noiseData.length; i += 1) {
+    noiseData[i] = (Math.random() * 2 - 1) * 0.7;
+  }
+
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = "lowpass";
+  noiseFilter.frequency.setValueAtTime(420, now);
+  noiseFilter.Q.setValueAtTime(0.7, now);
+  noise.connect(noiseFilter);
+  noiseFilter.connect(masterGain);
+  noise.start(now);
+  noise.stop(now + 0.25);
+}
+
+function isTapInsideTarget(event) {
+  const rect = gameTargetEl.getBoundingClientRect();
+  const radius = rect.width / 2;
+  const centerX = rect.left + radius;
+  const centerY = rect.top + radius;
+  const dx = event.clientX - centerX;
+  const dy = event.clientY - centerY;
+  return Math.hypot(dx, dy) <= radius;
+}
+
 function hitTarget() {
   if (!gameRunning) {
     return;
   }
 
   gameScore += 1;
+  totalHits += 1;
   gameScoreEl.textContent = String(gameScore);
+  flashScreen("hit");
+  playHitSound();
   moveTarget();
+  saveScoreState();
+}
+
+function missTarget() {
+  if (!gameRunning) {
+    return;
+  }
+
+  gameScore = Math.max(0, gameScore - 1);
+  totalMisses += 1;
+  gameScoreEl.textContent = String(gameScore);
+  flashScreen("miss");
+  playMissSound();
+  saveScoreState();
+}
+
+function handleBoardTap(event) {
+  if (!gameRunning) {
+    return;
+  }
+
+  event.preventDefault();
+  ensureAudioContext();
+
+  if (isTapInsideTarget(event)) {
+    hitTarget();
+    return;
+  }
+
+  missTarget();
 }
 
 gameStartEl.addEventListener("click", startGame);
-gameTargetEl.addEventListener("pointerdown", (event) => {
+gameBoardEl.addEventListener("pointerdown", handleBoardTap);
+document.addEventListener("gesturestart", (event) => {
   event.preventDefault();
-  hitTarget();
+});
+document.addEventListener("dblclick", (event) => {
+  event.preventDefault();
 });
